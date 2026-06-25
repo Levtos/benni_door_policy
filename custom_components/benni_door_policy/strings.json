@@ -1,0 +1,62 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Door Policy — Profil",
+        "description": "Profil-Route wählen (eine Instanz je Route).",
+        "data": {
+          "profile": "Profil"
+        }
+      },
+      "sources": {
+        "title": "Quellen",
+        "description": "Quell-Entities verdrahten (vorbefüllt, sofern vorhanden).",
+        "data": {
+          "lock_entity": "Schloss (lock)",
+          "presence_personal_entity": "Persönliche Anwesenheit",
+          "home_band_entity": "Heimband",
+          "battery_entity": "Batterie (optional)"
+        }
+      },
+      "options": {
+        "title": "Optionen",
+        "data": {
+          "apply_enabled": "Apply aktiv (Live statt Shadow)",
+          "startup_block_seconds": "Startup-Block (Sekunden)",
+          "battery_critical_percent": "Batterie kritisch unter (%)"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "Für dieses Profil existiert bereits eine Instanz."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Door Policy",
+        "menu_options": {
+          "sources": "Quellen ändern",
+          "options": "Optionen ändern"
+        }
+      },
+      "sources": {
+        "title": "Quellen",
+        "data": {
+          "lock_entity": "Schloss (lock)",
+          "presence_personal_entity": "Persönliche Anwesenheit",
+          "home_band_entity": "Heimband",
+          "battery_entity": "Batterie (optional)"
+        }
+      },
+      "options": {
+        "title": "Optionen",
+        "data": {
+          "apply_enabled": "Apply aktiv (Live statt Shadow)",
+          "startup_block_seconds": "Startup-Block (Sekunden)",
+          "battery_critical_percent": "Batterie kritisch unter (%)"
+        }
+      }
+    }
+  }
+}

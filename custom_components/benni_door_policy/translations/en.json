@@ -1,0 +1,62 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Door Policy — Profile",
+        "description": "Choose the profile route (one instance per route).",
+        "data": {
+          "profile": "Profile"
+        }
+      },
+      "sources": {
+        "title": "Sources",
+        "description": "Wire up source entities (pre-filled when available).",
+        "data": {
+          "lock_entity": "Lock",
+          "presence_personal_entity": "Personal presence",
+          "home_band_entity": "Home band",
+          "battery_entity": "Battery (optional)"
+        }
+      },
+      "options": {
+        "title": "Options",
+        "data": {
+          "apply_enabled": "Apply enabled (live instead of shadow)",
+          "startup_block_seconds": "Startup block (seconds)",
+          "battery_critical_percent": "Battery critical below (%)"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "An instance already exists for this profile."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Door Policy",
+        "menu_options": {
+          "sources": "Change sources",
+          "options": "Change options"
+        }
+      },
+      "sources": {
+        "title": "Sources",
+        "data": {
+          "lock_entity": "Lock",
+          "presence_personal_entity": "Personal presence",
+          "home_band_entity": "Home band",
+          "battery_entity": "Battery (optional)"
+        }
+      },
+      "options": {
+        "title": "Options",
+        "data": {
+          "apply_enabled": "Apply enabled (live instead of shadow)",
+          "startup_block_seconds": "Startup block (seconds)",
+          "battery_critical_percent": "Battery critical below (%)"
+        }
+      }
+    }
+  }
+}

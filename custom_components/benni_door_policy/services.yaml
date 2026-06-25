@@ -1,0 +1,24 @@
+apply_now:
+  name: Apply now
+  description: >-
+    Evaluiert die Türschloss-Policy sofort und wendet die fällige Aktion ohne
+    Stabilisierungs-Delay an (sofern apply_enabled aktiv und Zustand sicher).
+
+resync:
+  name: Resync
+  description: >-
+    Liest den aktuellen Schlosszustand neu ein und prüft die Szenarien (R-07).
+    Schaltet weiterhin nur stabilisiert und gated.
+
+set_apply_enabled:
+  name: Set apply enabled
+  description: >-
+    Schaltet den Shadow-/Live-Master. False = nur Anzeige (kein lock/unlock),
+    True = Policy schaltet das Schloss.
+  fields:
+    enabled:
+      name: Enabled
+      description: true = Live (schaltet), false = Shadow (nur Anzeige).
+      required: true
+      selector:
+        boolean: {}

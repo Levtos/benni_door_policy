@@ -1,0 +1,152 @@
+"""Konstanten der Benni Door Policy (Türschloss Aqara U200, L2-Policy).
+
+Eigenständige HACS-Custom-Integration. Konsumiert Foundation-/Feeder-Sensoren
+(benni_core_state: persönliche Anwesenheit + Heimband) AUSSCHLIESSLICH als
+HA-Entity-IDs aus dem Config-Flow — kein Python-Cross-Modul-Import.
+
+Profil-Modell (FLEET-16): Slug-Schema ``<profile>_door_policy_<feature>`` via
+``has_entity_name`` + profil-benanntem Device. Blaupause: benni_blind_policy.
+
+Lastenheft: einhornzentrale/docs/lastenhefte/reviewed/tuerschloss/
+"""
+from __future__ import annotations
+
+from typing import Final
+
+DOMAIN: Final[str] = "benni_door_policy"
+MODULE_ID: Final[str] = "door_policy"
+NAME: Final[str] = "Door Policy"
+
+STORAGE_VERSION: Final[int] = 1
+CONFIG_ENTRY_VERSION: Final[int] = 1
+
+# Datenwurzel in hass.data[DOMAIN].
+DATA_COORDINATOR: Final[str] = "coordinator"
+DATA_SKIP_RELOAD_COUNT: Final[str] = "skip_reload_count"
+
+
+def unique_id(entry_id: str, suffix: str) -> str:
+    """Stabile, kollisionsfreie unique_id (Domain + Entry + Suffix)."""
+    return f"{DOMAIN}_{entry_id}_{suffix}"
+
+
+def storage_suffix(entry_id: str) -> str:
+    return f"state_{entry_id}"
+
+
+# --------------------------------------------------------------------------- #
+# Profile (Route benni / eltern) — FLEET-16, Blaupause benni_core_state
+# --------------------------------------------------------------------------- #
+CONF_PROFILE: Final = "profile"
+PROFILE_BENNI: Final = "benni"
+PROFILE_ELTERN: Final = "eltern"
+PROFILES: Final = [PROFILE_BENNI, PROFILE_ELTERN]
+DEFAULT_PROFILE_ROUTE: Final = PROFILE_BENNI
+PROFILE_LABELS: Final = {PROFILE_BENNI: "Benni", PROFILE_ELTERN: "Eltern"}
+
+# --------------------------------------------------------------------------- #
+# Combined-Zustände (Lastenheft §4.1)
+# --------------------------------------------------------------------------- #
+STATE_VERRIEGELT: Final = "verriegelt"
+STATE_ENTRIEGELT: Final = "entriegelt"
+STATE_UNBEKANNT: Final = "unbekannt"
+STATE_NICHT_ERREICHBAR: Final = "nicht_erreichbar"
+
+# Roh-Zustände des physischen Schlosses (HA lock-Domain).
+RAW_LOCKED: Final = "locked"
+RAW_UNLOCKED: Final = "unlocked"
+RAW_UNLOCKING: Final = "unlocking"
+RAW_LOCKING: Final = "locking"
+RAW_OPEN: Final = "open"
+RAW_UNKNOWN: Final = "unknown"
+RAW_UNAVAILABLE: Final = "unavailable"
+
+# Aktionen, die der Coordinator ausführen darf. R-06: NIEMALS lock.open.
+ACTION_LOCK: Final = "lock"
+ACTION_UNLOCK: Final = "unlock"
+ACTION_NONE: Final = "none"
+
+# --------------------------------------------------------------------------- #
+# Eingangs-Wertebereiche (konsumiert aus benni_core_state)
+# --------------------------------------------------------------------------- #
+PRESENCE_HOME: Final = "zuhause"
+PRESENCE_AWAY: Final = "abwesend"
+PRESENCE_AT_PARENTS: Final = "bei_eltern"
+
+BAND_HOME: Final = "home"
+BAND_NEAR: Final = "near"
+BAND_PREHEAT: Final = "preheat"
+BAND_FAR: Final = "far"
+
+# --------------------------------------------------------------------------- #
+# Schwellen & Konstanten (Lastenheft §6) — nicht konfigurierbar außer Batterie.
+# --------------------------------------------------------------------------- #
+AUTO_LOCK_STABILIZE_SECONDS: Final = 60   # R-01: Schutz gegen kurze PSC-Flaps
+AUTO_UNLOCK_STABILIZE_SECONDS: Final = 5  # R-02: kurzer Bestätigungspuffer
+HA_START_DELAY_SECONDS: Final = 30        # R-07: System muss stabil sein
+UPDATE_INTERVAL_SECONDS: Final = 60       # periodische Re-Evaluation
+
+DEFAULT_BATTERY_CRITICAL: Final = 20      # < 20 % (Lastenheft §6, konfigurierbar)
+
+# --------------------------------------------------------------------------- #
+# Config-Keys — Quell-Entities (alle als Entity-IDs aus dem Flow)
+# --------------------------------------------------------------------------- #
+CONF_LOCK_ENTITY: Final = "lock_entity"
+CONF_PRESENCE_PERSONAL: Final = "presence_personal_entity"
+CONF_HOME_BAND: Final = "home_band_entity"
+CONF_BATTERY: Final = "battery_entity"          # optional
+
+# Options.
+CONF_APPLY_ENABLED: Final = "apply_enabled"
+CONF_STARTUP_BLOCK_SECONDS: Final = "startup_block_seconds"
+CONF_BATTERY_CRITICAL: Final = "battery_critical_percent"
+
+# Defaults.
+DEFAULT_APPLY_ENABLED: Final = False            # Shadow-safe out of the box
+DEFAULT_STARTUP_BLOCK_SECONDS: Final = HA_START_DELAY_SECONDS
+
+# --------------------------------------------------------------------------- #
+# Per-Profil-Prefill: bekannte Live-IDs (greift nur, WENN Entity existiert).
+# Benni-Anlage (einhornzentrale) via HA-MCP ermittelt. "eltern" bewusst leer.
+# --------------------------------------------------------------------------- #
+PROFILE_PREFILL: Final[dict[str, dict[str, str]]] = {
+    PROFILE_BENNI: {
+        CONF_LOCK_ENTITY: "lock.aqara_smart_lock_u200",
+        CONF_PRESENCE_PERSONAL: "sensor.benni_core_state_presence_personal",
+        CONF_HOME_BAND: "sensor.benni_core_state_presence_band",
+        CONF_BATTERY: "sensor.aqara_smart_lock_u200_battery",
+    },
+    PROFILE_ELTERN: {},
+}
+
+# Reihenfolge der Quell-Felder im Config-Flow (ein Schritt) + Optionen.
+SOURCE_KEYS: Final = (
+    CONF_LOCK_ENTITY, CONF_PRESENCE_PERSONAL, CONF_HOME_BAND, CONF_BATTERY,
+)
+OPTION_KEYS: Final = (
+    CONF_APPLY_ENABLED, CONF_STARTUP_BLOCK_SECONDS, CONF_BATTERY_CRITICAL,
+)
+
+# --------------------------------------------------------------------------- #
+# unique_id-Suffixe + Feature-Namen (→ <profile>_door_policy_<feature>)
+# --------------------------------------------------------------------------- #
+UID_LOCK_STATE: Final = "lock_state"
+UID_DEBUG: Final = "debug"
+UID_AUTO_LOCK: Final = "auto_lock_active"
+UID_AUTO_UNLOCK: Final = "auto_unlock_active"
+UID_BATTERY_CRITICAL: Final = "battery_critical"
+UID_APPLY_BLOCKED: Final = "apply_blocked"
+
+NAME_LOCK_STATE: Final = "Lock State"
+NAME_DEBUG: Final = "Debug"
+NAME_AUTO_LOCK: Final = "Auto Lock Active"
+NAME_AUTO_UNLOCK: Final = "Auto Unlock Active"
+NAME_BATTERY_CRITICAL: Final = "Battery Critical"
+NAME_APPLY_BLOCKED: Final = "Apply Blocked"
+
+# --------------------------------------------------------------------------- #
+# Services
+# --------------------------------------------------------------------------- #
+SERVICE_APPLY_NOW: Final = "apply_now"
+SERVICE_RESYNC: Final = "resync"
+SERVICE_SET_APPLY_ENABLED: Final = "set_apply_enabled"
