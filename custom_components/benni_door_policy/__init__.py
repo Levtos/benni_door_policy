@@ -15,12 +15,15 @@ from homeassistant.core import HomeAssistant, ServiceCall
 from .const import (
     DATA_COORDINATOR,
     DATA_SKIP_RELOAD_COUNT,
+    DATA_WS_REGISTERED,
     DOMAIN,
     SERVICE_APPLY_NOW,
     SERVICE_RESYNC,
     SERVICE_SET_APPLY_ENABLED,
 )
 from .coordinator import DoorPolicyCoordinator, all_coordinators
+from .view import async_remove_view, async_setup_view
+from .websocket_api import async_setup_websocket_api
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -38,6 +41,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     _async_register_services(hass)
+
+    await async_setup_view(hass)
+    if not data.get(DATA_WS_REGISTERED):
+        async_setup_websocket_api(hass)
+        data[DATA_WS_REGISTERED] = True
 
     entry.async_on_unload(entry.add_update_listener(_async_reload))
     return True
@@ -59,6 +67,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         if bucket:
             bucket[DATA_COORDINATOR].async_stop()
         if not all_coordinators(hass):
+            async_remove_view(hass)
             for svc in (SERVICE_APPLY_NOW, SERVICE_RESYNC, SERVICE_SET_APPLY_ENABLED):
                 if hass.services.has_service(DOMAIN, svc):
                     hass.services.async_remove(DOMAIN, svc)

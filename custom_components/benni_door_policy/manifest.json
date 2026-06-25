@@ -1,14 +1,14 @@
 {
   "domain": "benni_door_policy",
   "name": "Benni Door Policy",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "documentation": "https://github.com/Levtos/benni_door_policy",
   "issue_tracker": "https://github.com/Levtos/benni_door_policy/issues",
   "codeowners": ["@Levtos"],
   "config_flow": true,
   "iot_class": "calculated",
   "integration_type": "service",
-  "dependencies": [],
+  "dependencies": ["http", "websocket_api", "frontend"],
   "after_dependencies": ["benni_core_state"],
   "requirements": []
 }

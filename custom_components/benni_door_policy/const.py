@@ -23,6 +23,9 @@ CONFIG_ENTRY_VERSION: Final[int] = 1
 # Datenwurzel in hass.data[DOMAIN].
 DATA_COORDINATOR: Final[str] = "coordinator"
 DATA_SKIP_RELOAD_COUNT: Final[str] = "skip_reload_count"
+DATA_WS_REGISTERED: Final[str] = "_ws_registered"
+DATA_VIEW_STATIC: Final[str] = "_view_static_registered"
+DATA_VIEW_PANEL: Final[str] = "_view_panel_registered"
 
 
 def unique_id(entry_id: str, suffix: str) -> str:
@@ -150,3 +153,18 @@ NAME_APPLY_BLOCKED: Final = "Apply Blocked"
 SERVICE_APPLY_NOW: Final = "apply_now"
 SERVICE_RESYNC: Final = "resync"
 SERVICE_SET_APPLY_ENABLED: Final = "set_apply_enabled"
+
+# --------------------------------------------------------------------------- #
+# Panel / WebSocket-API (Observability + Shadow-Steuerung, Muster blind_policy)
+# --------------------------------------------------------------------------- #
+PANEL_URL_PATH: Final = "benni_door_policy"
+PANEL_TITLE: Final = "Door Policy"
+PANEL_ICON: Final = "mdi:lock-smart"
+FRONTEND_DIR_URL: Final = "/benni_door_policy_app"
+FRONTEND_ENTRY: Final = f"{FRONTEND_DIR_URL}/main.js"
+PANEL_ELEMENT: Final = "bdp-app"
+
+WS_GET_STATUS: Final = f"{DOMAIN}/get_status"
+WS_APPLY_NOW: Final = f"{DOMAIN}/apply_now"
+WS_RESYNC: Final = f"{DOMAIN}/resync"
+WS_SET_APPLY_ENABLED: Final = f"{DOMAIN}/set_apply_enabled"

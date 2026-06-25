@@ -87,6 +87,8 @@ class DoorPolicyCoordinator:
         # Verzögerter (stabilisierter) Schaltauftrag — höchstens einer offen.
         self._pending_action: str | None = None
         self._pending_unsub: CALLBACK_TYPE | None = None
+        self._pending_started_at: float | None = None   # monotonic
+        self._pending_delay: int = 0
 
         self._last_decision: policy.Decision | None = None
 
@@ -279,6 +281,8 @@ class DoorPolicyCoordinator:
             AUTO_LOCK_STABILIZE_SECONDS if action == ACTION_LOCK
             else AUTO_UNLOCK_STABILIZE_SECONDS
         )
+        self._pending_started_at = time.monotonic()
+        self._pending_delay = delay
 
         @callback
         def _fire(_now) -> None:
@@ -292,6 +296,8 @@ class DoorPolicyCoordinator:
             self._pending_unsub()
         self._pending_unsub = None
         self._pending_action = None
+        self._pending_started_at = None
+        self._pending_delay = 0
 
     async def _confirm_and_apply(self, action: str) -> None:
         """Nach Stabilisierung: Context neu lesen, nur ausführen, wenn die Aktion
@@ -347,6 +353,52 @@ class DoorPolicyCoordinator:
     def _skip_next_entry_reload(self) -> None:
         data = self.hass.data.setdefault(DOMAIN, {})
         data[DATA_SKIP_RELOAD_COUNT] = int(data.get(DATA_SKIP_RELOAD_COUNT) or 0) + 1
+
+    # ----- status snapshot (WS-API / Panel) -----
+    def _pending_remaining(self) -> int | None:
+        if self._pending_action is None or self._pending_started_at is None:
+            return None
+        rem = self._pending_delay - (time.monotonic() - self._pending_started_at)
+        return max(0, int(round(rem)))
+
+    def _startup_remaining(self) -> int:
+        if not self._ha_started:
+            return self.startup_block_seconds
+        rem = self.startup_block_seconds - (time.monotonic() - self._started_at)
+        return max(0, int(round(rem)))
+
+    def status_snapshot(self) -> dict[str, Any]:
+        d = self.last_decision
+        ctx = self.build_context()
+        return {
+            "profile": self.profile_route,
+            "apply_enabled": self.apply_enabled,
+            "startup_ready": self.startup_ready,
+            "startup_remaining_s": self._startup_remaining(),
+            "ha_start_delay_s": self.startup_block_seconds,
+            "combined_state": d.combined_state if d else None,
+            "action": d.action if d else None,
+            "auto_lock_active": d.auto_lock_active if d else None,
+            "auto_unlock_active": d.auto_unlock_active if d else None,
+            "reason": d.reason if d else None,
+            "apply_allowed": d.apply_allowed if d else None,
+            "blockers": list(d.blockers) if d else [],
+            "battery_critical": d.battery_critical if d else None,
+            "battery_threshold": self.battery_threshold,
+            # Pending wird vom Coordinator NUR gesetzt, wenn apply_allowed — d.h.
+            # während des Startup-Blocks gibt es bewusst keinen Countdown.
+            "pending_action": self._pending_action,
+            "pending_remaining_s": self._pending_remaining(),
+            "stabilize_lock_s": AUTO_LOCK_STABILIZE_SECONDS,
+            "stabilize_unlock_s": AUTO_UNLOCK_STABILIZE_SECONDS,
+            "lock_entity": self.lock_entity,
+            "context": {
+                "raw_lock_state": ctx.raw_lock_state,
+                "presence_personal": ctx.presence_personal,
+                "home_band": ctx.home_band,
+                "battery_percent": ctx.battery_percent,
+            },
+        }
 
     # ----- listeners -----
     def add_listener(self, cb: CALLBACK_TYPE) -> None:
