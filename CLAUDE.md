@@ -1,6 +1,7 @@
 # CLAUDE.md — Door Policy
 
-**Status:** v0.1.0 Erstbau (FLEET-155). Backend + Pure-Logic-Tests; Live-Verify offen.
+**Status:** v0.2.0 (FLEET-155). Backend + Pure-Logic-Tests + Observability-/Shadow-Panel.
+Live-Verify offen.
 **Letzte Aktualisierung:** 2026-06-25
 
 ## Was ist dieses Modul
