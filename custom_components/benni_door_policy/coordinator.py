@@ -56,6 +56,7 @@ from .const import (
     DOMAIN,
     UPDATE_INTERVAL_SECONDS,
 )
+from .sources import effective_presence_entity
 from .storage import make_store
 
 _LOGGER = logging.getLogger(__name__)
@@ -100,7 +101,12 @@ class DoorPolicyCoordinator:
         return {**self.entry.data, **self.entry.options}
 
     def _opt(self, key: str, default: Any = None) -> Any:
-        return self._opts.get(key, default)
+        value = self._opts.get(key)
+        if value:
+            return value
+        if key == CONF_PRESENCE_EFFECTIVE:
+            return effective_presence_entity(self._opts, default)
+        return default
 
     @property
     def profile_route(self) -> str:

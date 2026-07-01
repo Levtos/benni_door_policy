@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.2
+
+- Runtime-Fallback fuer bestehende ConfigEntries ohne `presence_effective_entity`:
+  Door Policy nutzt dann das profilierte Effective-Presence-Master-Default
+  `sensor.benni_core_state_presence_effective`.
+- Verhindert, dass migrierte Live-Instanzen nach dem Restart im Gate
+  `presence_effective_missing` haengen bleiben.
+
 ## 0.2.1
 
 - Door Policy konsumiert fuer Auto-Lock/Auto-Unlock `sensor.benni_core_state_presence_effective`
