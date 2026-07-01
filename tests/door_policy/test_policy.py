@@ -19,16 +19,30 @@ STATE_UNBEKANNT = const.STATE_UNBEKANNT
 STATE_NICHT_ERREICHBAR = const.STATE_NICHT_ERREICHBAR
 
 
-def _decide(raw=None, presence=None, band=None, battery=None, *, apply=True, ready=True):
+def _decide(
+    raw=None,
+    effective=None,
+    confidence=None,
+    battery=None,
+    *,
+    apply=True,
+    ready=True,
+    recent_action=None,
+    recent_age=None,
+    raw_age=999,
+):
     return policy.decide(
         policy.Context(
             raw_lock_state=raw,
-            presence_personal=presence,
-            home_band=band,
+            effective_presence=effective,
+            presence_confidence=confidence,
             battery_percent=battery,
         ),
         apply_enabled=apply,
         startup_ready=ready,
+        recent_lock_action=recent_action,
+        recent_lock_action_age_s=recent_age,
+        raw_lock_changed_age_s=raw_age,
     )
 
 
@@ -44,54 +58,59 @@ def test_combined_state_mapping():
 
 # ----- R-01 Auto-Lock -----
 def test_r01_autolock_away_and_unlocked_locks():
-    d = _decide(raw="unlocked", presence="abwesend", band="far")
+    d = _decide(raw="unlocked", effective="away")
     assert d.action == ACTION_LOCK
     assert d.auto_lock_active is True
     assert d.apply_allowed is True
 
 
 def test_r01_no_lock_when_already_locked():
-    d = _decide(raw="locked", presence="abwesend", band="far")
+    d = _decide(raw="locked", effective="away")
     assert d.action == ACTION_NONE
     assert d.auto_lock_active is False
 
 
 # ----- R-02 Auto-Unlock -----
-def test_r02_autounlock_home_band_and_locked_unlocks():
-    d = _decide(raw="locked", presence="abwesend", band="home")
+def test_r02_autounlock_arriving_high_confidence_and_locked_unlocks():
+    d = _decide(raw="locked", effective="arriving", confidence=0.93)
     assert d.action == ACTION_UNLOCK
     assert d.auto_unlock_active is True
 
 
 def test_r02_no_unlock_when_already_home_presence():
-    # Anwesenheit zuhause → Auto-Unlock-Bedingung (≠ zuhause) verfehlt.
-    d = _decide(raw="locked", presence="zuhause", band="home")
+    d = _decide(raw="locked", effective="home", confidence=0.98)
     assert d.action == ACTION_NONE
 
 
-def test_r02_no_unlock_on_near_or_preheat():
-    for band in ("near", "preheat", "far"):
-        d = _decide(raw="locked", presence="abwesend", band=band)
-        assert d.action == ACTION_NONE, band
+def test_r02_no_unlock_on_uncertain_or_stale():
+    for effective in ("uncertain", "stale", "away", "leaving"):
+        d = _decide(raw="locked", effective=effective, confidence=0.95)
+        assert d.action == ACTION_NONE, effective
+
+
+def test_r02_no_unlock_when_arriving_confidence_low():
+    d = _decide(raw="locked", effective="arriving", confidence=0.55)
+    assert d.action == ACTION_NONE
+    assert "arriving_confidence_low" in d.blockers
 
 
 # ----- R-04 unsichere Zustände -----
 def test_r04_no_action_when_unknown():
-    d = _decide(raw="unknown", presence="abwesend", band="home")
+    d = _decide(raw="unknown", effective="arriving", confidence=0.93)
     assert d.action == ACTION_NONE
     assert d.apply_allowed is False
     assert any(b.startswith("source_unsafe") for b in d.blockers)
 
 
 def test_r04_no_action_when_unavailable():
-    d = _decide(raw="unavailable", presence="abwesend", band="far")
+    d = _decide(raw="unavailable", effective="away")
     assert d.action == ACTION_NONE
     assert d.apply_allowed is False
 
 
 # ----- R-05 keine Verriegelung bei Anwesenheit -----
 def test_r05_no_autolock_when_present():
-    d = _decide(raw="unlocked", presence="zuhause", band="home")
+    d = _decide(raw="unlocked", effective="home")
     assert d.action == ACTION_NONE
     assert d.auto_lock_active is False
     assert "present_no_autolock" in d.blockers
@@ -99,28 +118,80 @@ def test_r05_no_autolock_when_present():
 
 # ----- Gating: Shadow + Startup -----
 def test_gating_shadow_blocks_apply_but_keeps_action():
-    d = _decide(raw="unlocked", presence="abwesend", band="far", apply=False)
+    d = _decide(raw="unlocked", effective="away", apply=False)
     assert d.action == ACTION_LOCK          # Aktion bleibt sichtbar
     assert d.apply_allowed is False
     assert "apply_disabled" in d.blockers
 
 
 def test_gating_startup_blocks_apply():
-    d = _decide(raw="unlocked", presence="abwesend", band="far", ready=False)
+    d = _decide(raw="unlocked", effective="away", ready=False)
     assert d.apply_allowed is False
     assert "startup_block" in d.blockers
 
 
 # ----- presence unknown → konservativ -----
-def test_presence_unknown_no_autolock():
-    d = _decide(raw="unlocked", presence=None, band="far")
+def test_presence_effective_missing_no_autolock():
+    d = _decide(raw="unlocked", effective=None)
     assert d.action == ACTION_NONE
-    assert "presence_unknown" in d.blockers
+    assert "presence_effective_missing" in d.blockers
 
 
 # ----- Batterie -----
 def test_battery_critical_attribute():
-    d = _decide(raw="locked", presence="zuhause", band="home", battery=12)
+    d = _decide(raw="locked", effective="home", battery=12)
     assert d.battery_critical is True
-    d2 = _decide(raw="locked", presence="zuhause", band="home", battery=55)
+    d2 = _decide(raw="locked", effective="home", battery=55)
     assert d2.battery_critical is False
+
+
+def test_leaving_with_stale_home_band_locks_but_does_not_unlock():
+    d = _decide(raw="unlocked", effective="leaving")
+    assert d.action == ACTION_LOCK
+    assert d.auto_lock_active is True
+    assert d.auto_unlock_active is False
+
+
+def test_arriving_after_stable_away_is_unlock_candidate():
+    d = _decide(raw="locked", effective="arriving", confidence=0.95)
+    assert d.action == ACTION_UNLOCK
+    assert d.auto_unlock_active is True
+
+
+def test_away_near_without_clear_trend_uncertain_no_unlock():
+    d = _decide(raw="locked", effective="uncertain", confidence=0.35)
+    assert d.action == ACTION_NONE
+    assert "presence_uncertain" in d.blockers
+
+
+def test_lock_unlock_anti_flap_blocks_fast_opposite_action():
+    d = _decide(
+        raw="locked",
+        effective="arriving",
+        confidence=0.95,
+        recent_action=ACTION_LOCK,
+        recent_age=30,
+    )
+    assert d.action == ACTION_UNLOCK
+    assert d.apply_allowed is False
+    assert "lock_unlock_anti_flap" in d.blockers
+
+
+def test_unlock_cooldown_blocks_fast_repeated_unlock():
+    d = _decide(
+        raw="locked",
+        effective="arriving",
+        confidence=0.95,
+        recent_action=ACTION_UNLOCK,
+        recent_age=30,
+    )
+    assert d.action == ACTION_UNLOCK
+    assert d.apply_allowed is False
+    assert "unlock_cooldown" in d.blockers
+
+
+def test_external_raw_lock_change_suppresses_policy_oscillation():
+    d = _decide(raw="locked", effective="arriving", confidence=0.95, raw_age=30)
+    assert d.action == ACTION_UNLOCK
+    assert d.apply_allowed is False
+    assert "raw_lock_recently_changed" in d.blockers
