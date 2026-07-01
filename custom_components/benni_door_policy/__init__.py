@@ -13,10 +13,15 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall
 
 from .const import (
+    CONFIG_ENTRY_VERSION,
     DATA_COORDINATOR,
     DATA_SKIP_RELOAD_COUNT,
     DATA_WS_REGISTERED,
     DOMAIN,
+    CONF_PRESENCE_EFFECTIVE,
+    CONF_PROFILE,
+    DEFAULT_PROFILE_ROUTE,
+    PROFILE_PREFILL,
     SERVICE_APPLY_NOW,
     SERVICE_RESYNC,
     SERVICE_SET_APPLY_ENABLED,
@@ -30,7 +35,24 @@ _LOGGER = logging.getLogger(__name__)
 PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.BINARY_SENSOR]
 
 
+def _migrated_entry(entry: ConfigEntry) -> tuple[bool, dict, dict]:
+    changed = False
+    data = dict(entry.data)
+    options = dict(entry.options)
+    profile = data.get(CONF_PROFILE, DEFAULT_PROFILE_ROUTE)
+    default_effective = PROFILE_PREFILL.get(profile, {}).get(CONF_PRESENCE_EFFECTIVE)
+    if default_effective and not data.get(CONF_PRESENCE_EFFECTIVE) and not options.get(CONF_PRESENCE_EFFECTIVE):
+        data[CONF_PRESENCE_EFFECTIVE] = default_effective
+        changed = True
+    return changed, data, options
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    changed, data, options = _migrated_entry(entry)
+    if changed:
+        hass.config_entries.async_update_entry(entry, data=data, options=options)
+        _LOGGER.info("Migrated benni_door_policy effective presence binding during setup")
+
     coord = DoorPolicyCoordinator(hass, entry)
     await coord.async_load()
     coord.async_start()
@@ -48,6 +70,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         data[DATA_WS_REGISTERED] = True
 
     entry.async_on_unload(entry.add_update_listener(_async_reload))
+    return True
+
+
+async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    changed, data, options = _migrated_entry(entry)
+    if changed or entry.version < CONFIG_ENTRY_VERSION:
+        hass.config_entries.async_update_entry(
+            entry,
+            data=data,
+            options=options,
+            version=CONFIG_ENTRY_VERSION,
+        )
+        _LOGGER.info("Migrated benni_door_policy config entry")
     return True
 
 

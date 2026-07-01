@@ -13,8 +13,7 @@
         "description": "Wire up source entities (pre-filled when available).",
         "data": {
           "lock_entity": "Lock",
-          "presence_personal_entity": "Personal presence",
-          "home_band_entity": "Home band",
+          "presence_effective_entity": "Effective presence",
           "battery_entity": "Battery (optional)"
         }
       },
@@ -44,8 +43,7 @@
         "title": "Sources",
         "data": {
           "lock_entity": "Lock",
-          "presence_personal_entity": "Personal presence",
-          "home_band_entity": "Home band",
+          "presence_effective_entity": "Effective presence",
           "battery_entity": "Battery (optional)"
         }
       },

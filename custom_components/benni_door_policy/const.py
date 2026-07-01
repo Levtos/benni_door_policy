@@ -1,8 +1,8 @@
 """Konstanten der Benni Door Policy (Türschloss Aqara U200, L2-Policy).
 
-Eigenständige HACS-Custom-Integration. Konsumiert Foundation-/Feeder-Sensoren
-(benni_core_state: persönliche Anwesenheit + Heimband) AUSSCHLIESSLICH als
-HA-Entity-IDs aus dem Config-Flow — kein Python-Cross-Modul-Import.
+Eigenständige HACS-Custom-Integration. Konsumiert den stabilisierten
+Effective-Presence-Vertrag aus benni_core_state AUSSCHLIESSLICH als HA-Entity-ID
+aus dem Config-Flow — kein Python-Cross-Modul-Import.
 
 Profil-Modell (FLEET-16): Slug-Schema ``<profile>_door_policy_<feature>`` via
 ``has_entity_name`` + profil-benanntem Device. Blaupause: benni_blind_policy.
@@ -18,7 +18,7 @@ MODULE_ID: Final[str] = "door_policy"
 NAME: Final[str] = "Door Policy"
 
 STORAGE_VERSION: Final[int] = 1
-CONFIG_ENTRY_VERSION: Final[int] = 1
+CONFIG_ENTRY_VERSION: Final[int] = 2
 
 # Datenwurzel in hass.data[DOMAIN].
 DATA_COORDINATOR: Final[str] = "coordinator"
@@ -72,14 +72,12 @@ ACTION_NONE: Final = "none"
 # --------------------------------------------------------------------------- #
 # Eingangs-Wertebereiche (konsumiert aus benni_core_state)
 # --------------------------------------------------------------------------- #
-PRESENCE_HOME: Final = "zuhause"
-PRESENCE_AWAY: Final = "abwesend"
-PRESENCE_AT_PARENTS: Final = "bei_eltern"
-
-BAND_HOME: Final = "home"
-BAND_NEAR: Final = "near"
-BAND_PREHEAT: Final = "preheat"
-BAND_FAR: Final = "far"
+EFFECTIVE_HOME: Final = "home"
+EFFECTIVE_AWAY: Final = "away"
+EFFECTIVE_ARRIVING: Final = "arriving"
+EFFECTIVE_LEAVING: Final = "leaving"
+EFFECTIVE_UNCERTAIN: Final = "uncertain"
+EFFECTIVE_STALE: Final = "stale"
 
 # --------------------------------------------------------------------------- #
 # Schwellen & Konstanten (Lastenheft §6) — nicht konfigurierbar außer Batterie.
@@ -88,6 +86,9 @@ AUTO_LOCK_STABILIZE_SECONDS: Final = 60   # R-01: Schutz gegen kurze PSC-Flaps
 AUTO_UNLOCK_STABILIZE_SECONDS: Final = 5  # R-02: kurzer Bestätigungspuffer
 HA_START_DELAY_SECONDS: Final = 30        # R-07: System muss stabil sein
 UPDATE_INTERVAL_SECONDS: Final = 60       # periodische Re-Evaluation
+UNLOCK_COOLDOWN_SECONDS: Final = 180
+LOCK_UNLOCK_ANTI_FLAP_SECONDS: Final = 120
+AUTO_UNLOCK_MIN_CONFIDENCE: Final = 0.9
 
 DEFAULT_BATTERY_CRITICAL: Final = 20      # < 20 % (Lastenheft §6, konfigurierbar)
 
@@ -95,8 +96,7 @@ DEFAULT_BATTERY_CRITICAL: Final = 20      # < 20 % (Lastenheft §6, konfigurierb
 # Config-Keys — Quell-Entities (alle als Entity-IDs aus dem Flow)
 # --------------------------------------------------------------------------- #
 CONF_LOCK_ENTITY: Final = "lock_entity"
-CONF_PRESENCE_PERSONAL: Final = "presence_personal_entity"
-CONF_HOME_BAND: Final = "home_band_entity"
+CONF_PRESENCE_EFFECTIVE: Final = "presence_effective_entity"
 CONF_BATTERY: Final = "battery_entity"          # optional
 
 # Options.
@@ -115,8 +115,7 @@ DEFAULT_STARTUP_BLOCK_SECONDS: Final = HA_START_DELAY_SECONDS
 PROFILE_PREFILL: Final[dict[str, dict[str, str]]] = {
     PROFILE_BENNI: {
         CONF_LOCK_ENTITY: "lock.aqara_smart_lock_u200",
-        CONF_PRESENCE_PERSONAL: "sensor.benni_core_state_presence_personal",
-        CONF_HOME_BAND: "sensor.benni_core_state_presence_band",
+        CONF_PRESENCE_EFFECTIVE: "sensor.benni_core_state_presence_effective",
         CONF_BATTERY: "sensor.aqara_smart_lock_u200_battery",
     },
     PROFILE_ELTERN: {},
@@ -124,7 +123,7 @@ PROFILE_PREFILL: Final[dict[str, dict[str, str]]] = {
 
 # Reihenfolge der Quell-Felder im Config-Flow (ein Schritt) + Optionen.
 SOURCE_KEYS: Final = (
-    CONF_LOCK_ENTITY, CONF_PRESENCE_PERSONAL, CONF_HOME_BAND, CONF_BATTERY,
+    CONF_LOCK_ENTITY, CONF_PRESENCE_EFFECTIVE, CONF_BATTERY,
 )
 OPTION_KEYS: Final = (
     CONF_APPLY_ENABLED, CONF_STARTUP_BLOCK_SECONDS, CONF_BATTERY_CRITICAL,

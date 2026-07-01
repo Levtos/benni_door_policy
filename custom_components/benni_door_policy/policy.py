@@ -23,10 +23,15 @@ from .const import (
     ACTION_LOCK,
     ACTION_NONE,
     ACTION_UNLOCK,
-    BAND_HOME,
+    AUTO_UNLOCK_MIN_CONFIDENCE,
     DEFAULT_BATTERY_CRITICAL,
-    PRESENCE_AWAY,
-    PRESENCE_HOME,
+    EFFECTIVE_ARRIVING,
+    EFFECTIVE_AWAY,
+    EFFECTIVE_HOME,
+    EFFECTIVE_LEAVING,
+    EFFECTIVE_STALE,
+    EFFECTIVE_UNCERTAIN,
+    LOCK_UNLOCK_ANTI_FLAP_SECONDS,
     RAW_LOCKED,
     RAW_LOCKING,
     RAW_OPEN,
@@ -38,6 +43,7 @@ from .const import (
     STATE_NICHT_ERREICHBAR,
     STATE_UNBEKANNT,
     STATE_VERRIEGELT,
+    UNLOCK_COOLDOWN_SECONDS,
 )
 
 # Unsichere Combined-Zustände — hier niemals automatisch handeln (R-04).
@@ -49,8 +55,8 @@ class Context:
     """Snapshot aller Quell-Inputs für eine Entscheidung. None = unknown."""
 
     raw_lock_state: str | None = None       # locked / unlocked / unlocking / ...
-    presence_personal: str | None = None    # zuhause / abwesend / bei_eltern
-    home_band: str | None = None            # home / near / preheat / far
+    effective_presence: str | None = None   # home / away / arriving / leaving / uncertain / stale
+    presence_confidence: float | None = None
     battery_percent: float | None = None    # % (Attribut, optional)
 
 
@@ -104,12 +110,15 @@ def decide(
     apply_enabled: bool,
     startup_ready: bool,
     battery_threshold: int = DEFAULT_BATTERY_CRITICAL,
+    recent_lock_action: str | None = None,
+    recent_lock_action_age_s: float | None = None,
+    raw_lock_changed_age_s: float | None = None,
 ) -> Decision:
     """Vollständige Entscheidung inkl. Gating-Overlay (Lastenheft §4.2/§4.3, R-01..R-08).
 
-    Auto-Lock   (R-01): Anwesenheit = abwesend UND Zustand = entriegelt → ``lock``.
-    Auto-Unlock (R-02): Heimband = home UND Anwesenheit ≠ zuhause UND Zustand =
-                        verriegelt → ``unlock``.
+    Auto-Lock   (R-01): effective_presence away/leaving UND Zustand entriegelt → ``lock``.
+    Auto-Unlock (R-02): effective_presence arriving mit hoher Confidence UND
+                        Zustand verriegelt → ``unlock``.
     R-03 (Zielzustand erreicht) ergibt sich implizit: Auto-Lock verlangt entriegelt,
     Auto-Unlock verlangt verriegelt — ist das Schloss schon im Ziel, matcht keine Regel.
     R-04 (unsicher) + R-05 (keine Verriegelung bei Anwesenheit) sind explizit gegated.
@@ -118,12 +127,17 @@ def decide(
     bat_crit = battery_critical(ctx.battery_percent, battery_threshold)
 
     # Szenarien (rein kontextuell, ohne Gating).
+    confidence = ctx.presence_confidence
+    high_confidence = (
+        confidence is not None and confidence >= AUTO_UNLOCK_MIN_CONFIDENCE
+    )
     auto_lock_active = (
-        ctx.presence_personal == PRESENCE_AWAY and state == STATE_ENTRIEGELT
+        ctx.effective_presence in (EFFECTIVE_AWAY, EFFECTIVE_LEAVING)
+        and state == STATE_ENTRIEGELT
     )
     auto_unlock_active = (
-        ctx.home_band == BAND_HOME
-        and ctx.presence_personal != PRESENCE_HOME
+        ctx.effective_presence == EFFECTIVE_ARRIVING
+        and high_confidence
         and state == STATE_VERRIEGELT
     )
 
@@ -135,15 +149,16 @@ def decide(
         blockers.append(f"source_unsafe:{state}")
         apply_allowed = False
 
-    # R-05: keine automatische Verriegelung bei Anwesenheit (Fluchtweg).
-    #       (Greift nur defensiv; auto_lock_active ist bei zuhause ohnehin False.)
-    if ctx.presence_personal == PRESENCE_HOME:
+    if ctx.effective_presence == EFFECTIVE_HOME:
         blockers.append("present_no_autolock")
 
-    if ctx.presence_personal is None:
-        # Lastenheft §2: Anwesenheit unknown → konservativ als zuhause behandeln
-        # (keine automatische Verriegelung).
-        blockers.append("presence_unknown")
+    if ctx.effective_presence is None:
+        blockers.append("presence_effective_missing")
+    elif ctx.effective_presence in (EFFECTIVE_UNCERTAIN, EFFECTIVE_STALE):
+        blockers.append(f"presence_{ctx.effective_presence}")
+
+    if ctx.effective_presence == EFFECTIVE_ARRIVING and not high_confidence:
+        blockers.append("arriving_confidence_low")
 
     if not apply_enabled:
         blockers.append("apply_disabled")
@@ -158,13 +173,36 @@ def decide(
         reason = f"unsicherer Zustand ({state}) — keine Aktion (R-04)"
     elif auto_lock_active:
         action = ACTION_LOCK
-        reason = "auto_lock: abwesend + entriegelt → verriegeln (R-01)"
+        reason = "auto_lock: effective_presence away/leaving + entriegelt → verriegeln (R-01)"
     elif auto_unlock_active:
         action = ACTION_UNLOCK
-        reason = "auto_unlock: Heimband home + nicht zuhause + verriegelt → entriegeln (R-02)"
+        reason = "auto_unlock: effective_presence arriving + high confidence + verriegelt → entriegeln (R-02)"
     else:
         action = ACTION_NONE
         reason = "kein Szenario aktiv — Schloss bleibt (R-03)"
+
+    if action == ACTION_UNLOCK and _recent(
+        recent_lock_action, recent_lock_action_age_s, ACTION_UNLOCK, UNLOCK_COOLDOWN_SECONDS
+    ):
+        blockers.append("unlock_cooldown")
+        apply_allowed = False
+
+    if action in (ACTION_LOCK, ACTION_UNLOCK):
+        opposite = ACTION_UNLOCK if action == ACTION_LOCK else ACTION_LOCK
+        if _recent(
+            recent_lock_action,
+            recent_lock_action_age_s,
+            opposite,
+            LOCK_UNLOCK_ANTI_FLAP_SECONDS,
+        ):
+            blockers.append("lock_unlock_anti_flap")
+            apply_allowed = False
+        if (
+            raw_lock_changed_age_s is not None
+            and raw_lock_changed_age_s < LOCK_UNLOCK_ANTI_FLAP_SECONDS
+        ):
+            blockers.append("raw_lock_recently_changed")
+            apply_allowed = False
 
     return Decision(
         combined_state=state,
@@ -175,4 +213,17 @@ def decide(
         battery_critical=bat_crit,
         blockers=blockers,
         apply_allowed=apply_allowed,
+    )
+
+
+def _recent(
+    recent_action: str | None,
+    age_s: float | None,
+    expected_action: str,
+    window_s: int,
+) -> bool:
+    return (
+        recent_action == expected_action
+        and age_s is not None
+        and age_s < window_s
     )

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.1
+
+- Door Policy konsumiert fuer Auto-Lock/Auto-Unlock `sensor.benni_core_state_presence_effective`
+  statt selbst aus Person/Heimband zu arbitrieren.
+- Auto-Unlock ist nur noch bei `arriving` mit hoher Confidence moeglich.
+- Anti-Flap/Cooldown-Gates fuer schnelle Lock/Unlock-Gegenaktionen, wiederholte
+  Unlocks und frische Roh-Schlosszustandswechsel.
+- ConfigEntry-Migration auf den neuen Effective-Presence-Source-Slot.
+
 ## 0.2.0
 
 - **Observability-/Shadow-Panel** (FLEET-155). Sidebar-Panel „Door Policy" im

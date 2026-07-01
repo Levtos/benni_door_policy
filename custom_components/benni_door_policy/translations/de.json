@@ -13,8 +13,7 @@
         "description": "Quell-Entities verdrahten (vorbefüllt, sofern vorhanden).",
         "data": {
           "lock_entity": "Schloss (lock)",
-          "presence_personal_entity": "Persönliche Anwesenheit",
-          "home_band_entity": "Heimband",
+          "presence_effective_entity": "Effective Presence",
           "battery_entity": "Batterie (optional)"
         }
       },
@@ -44,8 +43,7 @@
         "title": "Quellen",
         "data": {
           "lock_entity": "Schloss (lock)",
-          "presence_personal_entity": "Persönliche Anwesenheit",
-          "home_band_entity": "Heimband",
+          "presence_effective_entity": "Effective Presence",
           "battery_entity": "Batterie (optional)"
         }
       },

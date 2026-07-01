@@ -54,8 +54,8 @@ class LockStateSensor(DoorPolicyEntity, SensorEntity):
             "auto_unlock_aktiv": d.auto_unlock_active if d else None,
             "batterie_prozent": ctx.battery_percent,
             "batterie_kritisch": d.battery_critical if d else None,
-            "heimband": ctx.home_band,
-            "persoenliche_anwesenheit": ctx.presence_personal,
+            "effective_presence": ctx.effective_presence,
+            "presence_confidence": ctx.presence_confidence,
         }
 
 
@@ -86,8 +86,8 @@ class DebugSensor(DoorPolicyEntity, SensorEntity):
             "auto_lock_active": d.auto_lock_active if d else None,
             "auto_unlock_active": d.auto_unlock_active if d else None,
             "raw_lock_state": ctx.raw_lock_state,
-            "presence_personal": ctx.presence_personal,
-            "home_band": ctx.home_band,
+            "effective_presence": ctx.effective_presence,
+            "presence_confidence": ctx.presence_confidence,
             "battery_percent": ctx.battery_percent,
             "battery_critical": d.battery_critical if d else None,
             "profile": self.coord.profile_route,

@@ -2,15 +2,16 @@
 
 Türschloss-Policy (Aqara Smart Lock U200) als eigenständige HACS-Custom-Integration — L2 im benni_* Home-Assistant-Fleet.
 
-**Status:** v0.1.0 — erster Entwurf (Backend + Pure-Logic-Tests). Live-Verify offen.
+**Status:** v0.2.1 — Presence-Arbitration kommt aus `benni_core_state`; Pure-Logic-Tests vorhanden. Live-Verify offen.
 **Lastenheft:** `einhornzentrale/docs/lastenhefte/reviewed/tuerschloss/` (führend).
 
 ## Kernformel
 > Weggehen verriegelt. Heimkommen entriegelt. Öffnen bleibt immer bewusst manuell.
 
 ## Was es tut
-- **Auto-Lock (R-01):** persönliche Anwesenheit `abwesend` **und** Schloss `entriegelt` → verriegeln (60 s Stabilisierung).
-- **Auto-Unlock (R-02):** Heimband `home` **und** Anwesenheit ≠ `zuhause` **und** Schloss `verriegelt` → entriegeln (5 s Stabilisierung). Tür bleibt zu.
+- **Auto-Lock (R-01):** `effective_presence` `away`/`leaving` **und** Schloss `entriegelt` → verriegeln (60 s Stabilisierung).
+- **Auto-Unlock (R-02):** `effective_presence=arriving` mit hoher Confidence **und** Schloss `verriegelt` → entriegeln (5 s Stabilisierung). Tür bleibt zu.
+- **Anti-Flap:** schnelle Lock/Unlock-Gegenaktionen, wiederholte Unlocks und frische Roh-Schlosszustandswechsel werden geblockt.
 - **Combined-Sensor** (`verriegelt` / `entriegelt` / `unbekannt` / `nicht_erreichbar`) mit Attributen (Batterie, Szenario-Flags, Heimband, Anwesenheit).
 - **Resync** nach HA-Start + periodisch (R-07).
 
@@ -22,8 +23,7 @@ Türschloss-Policy (Aqara Smart Lock U200) als eigenständige HACS-Custom-Integr
 
 ## Konsumierte Quellen (als Entity-IDs aus dem Config-Flow)
 - Schloss: `lock.aqara_smart_lock_u200`
-- Persönliche Anwesenheit: `sensor.benni_core_state_presence_personal`
-- Heimband: `sensor.benni_core_state_presence_band`
+- Effective Presence: `sensor.benni_core_state_presence_effective`
 - Batterie (optional): Entity oder Attribut `battery_level` am Schloss
 
 Kein Python-Cross-Modul-Import — strikt Entity-IDs.

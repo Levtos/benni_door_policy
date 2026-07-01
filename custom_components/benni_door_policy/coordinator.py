@@ -2,7 +2,7 @@
 
 HA-Brücke um die pure Engine (policy.py):
 
-  * liest Quell-Entities (Schloss, Anwesenheit, Heimband, Batterie),
+  * liest Quell-Entities (Schloss, Effective Presence, Batterie),
   * rechnet ``policy.decide`` und führt die Aktion **gated** aus (apply_enabled =
     Shadow-Master, Default False),
   * Stabilisierung wie im Lastenheft (R-01: 60 s, R-02: 5 s) via verzögertem
@@ -27,6 +27,7 @@ from homeassistant.helpers.event import (
     async_track_state_change_event,
     async_track_time_interval,
 )
+from homeassistant.util import dt as dt_util
 
 try:  # pragma: no cover
     from homeassistant.helpers.start import async_at_started
@@ -43,9 +44,8 @@ from .const import (
     CONF_APPLY_ENABLED,
     CONF_BATTERY,
     CONF_BATTERY_CRITICAL,
-    CONF_HOME_BAND,
+    CONF_PRESENCE_EFFECTIVE,
     CONF_LOCK_ENTITY,
-    CONF_PRESENCE_PERSONAL,
     CONF_PROFILE,
     CONF_STARTUP_BLOCK_SECONDS,
     DATA_SKIP_RELOAD_COUNT,
@@ -91,6 +91,8 @@ class DoorPolicyCoordinator:
         self._pending_delay: int = 0
 
         self._last_decision: policy.Decision | None = None
+        self._last_applied_action: str | None = None
+        self._last_applied_at: float | None = None
 
     # ----- options / profile -----
     @property
@@ -147,7 +149,11 @@ class DoorPolicyCoordinator:
             )
 
         watch: set[str] = set()
-        for key in (CONF_LOCK_ENTITY, CONF_PRESENCE_PERSONAL, CONF_HOME_BAND, CONF_BATTERY):
+        for key in (
+            CONF_LOCK_ENTITY,
+            CONF_PRESENCE_EFFECTIVE,
+            CONF_BATTERY,
+        ):
             v = self._opt(key)
             if isinstance(v, str) and v:
                 watch.add(v)
@@ -222,6 +228,15 @@ class DoorPolicyCoordinator:
             return None
         return st.state
 
+    def _read_attr(self, key: str, attr: str) -> Any:
+        eid = self._opt(key)
+        if not eid:
+            return None
+        st = self.hass.states.get(eid)
+        if st is None:
+            return None
+        return st.attributes.get(attr)
+
     def _battery_percent(self) -> float | None:
         """Batterie aus eigener Entity ODER als Attribut am Schloss (Lastenheft N-2)."""
         eid = self._opt(CONF_BATTERY)
@@ -242,10 +257,25 @@ class DoorPolicyCoordinator:
         raw_lock = lock_st.state if lock_st is not None else None
         return policy.Context(
             raw_lock_state=raw_lock,
-            presence_personal=self._read(CONF_PRESENCE_PERSONAL),
-            home_band=self._read(CONF_HOME_BAND),
+            effective_presence=self._read(CONF_PRESENCE_EFFECTIVE),
+            presence_confidence=_float_or_none(
+                self._read_attr(CONF_PRESENCE_EFFECTIVE, "confidence")
+            ),
             battery_percent=self._battery_percent(),
         )
+
+    def _recent_action_age_s(self) -> float | None:
+        if self._last_applied_at is None:
+            return None
+        return time.monotonic() - self._last_applied_at
+
+    def _raw_lock_changed_age_s(self) -> float | None:
+        if not self.lock_entity:
+            return None
+        st = self.hass.states.get(self.lock_entity)
+        if st is None or st.last_changed is None:
+            return None
+        return max(0.0, (dt_util.utcnow() - st.last_changed).total_seconds())
 
     # ----- evaluation -----
     async def async_evaluate(self) -> policy.Decision:
@@ -255,6 +285,9 @@ class DoorPolicyCoordinator:
             apply_enabled=self.apply_enabled,
             startup_ready=self._startup_ready(),
             battery_threshold=self.battery_threshold,
+            recent_lock_action=self._last_applied_action,
+            recent_lock_action_age_s=self._recent_action_age_s(),
+            raw_lock_changed_age_s=self._raw_lock_changed_age_s(),
         )
         self._last_decision = decision
 
@@ -309,6 +342,9 @@ class DoorPolicyCoordinator:
             apply_enabled=self.apply_enabled,
             startup_ready=self._startup_ready(),
             battery_threshold=self.battery_threshold,
+            recent_lock_action=self._last_applied_action,
+            recent_lock_action_age_s=self._recent_action_age_s(),
+            raw_lock_changed_age_s=self._raw_lock_changed_age_s(),
         )
         self._last_decision = decision
         if not (decision.apply_allowed and decision.action == action):
@@ -328,6 +364,8 @@ class DoorPolicyCoordinator:
             await self.hass.services.async_call(
                 "lock", service, {"entity_id": self.lock_entity}, blocking=False
             )
+            self._last_applied_action = action
+            self._last_applied_at = time.monotonic()
             _LOGGER.info("door_policy: lock.%s → %s", service, self.lock_entity)
         except Exception as err:  # noqa: BLE001
             _LOGGER.warning("door_policy: lock.%s failed: %s", service, err)
@@ -394,8 +432,8 @@ class DoorPolicyCoordinator:
             "lock_entity": self.lock_entity,
             "context": {
                 "raw_lock_state": ctx.raw_lock_state,
-                "presence_personal": ctx.presence_personal,
-                "home_band": ctx.home_band,
+                "effective_presence": ctx.effective_presence,
+                "presence_confidence": ctx.presence_confidence,
                 "battery_percent": ctx.battery_percent,
             },
         }
