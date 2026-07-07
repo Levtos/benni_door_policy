@@ -21,12 +21,12 @@ from .const import (
     CONF_PRESENCE_EFFECTIVE,
     CONF_PROFILE,
     DEFAULT_PROFILE_ROUTE,
-    PROFILE_PREFILL,
     SERVICE_APPLY_NOW,
     SERVICE_RESYNC,
     SERVICE_SET_APPLY_ENABLED,
 )
 from .coordinator import DoorPolicyCoordinator, all_coordinators
+from .sources import migrate_effective_presence
 from .view import async_remove_view, async_setup_view
 from .websocket_api import async_setup_websocket_api
 
@@ -40,9 +40,11 @@ def _migrated_entry(entry: ConfigEntry) -> tuple[bool, dict, dict]:
     data = dict(entry.data)
     options = dict(entry.options)
     profile = data.get(CONF_PROFILE, DEFAULT_PROFILE_ROUTE)
-    default_effective = PROFILE_PREFILL.get(profile, {}).get(CONF_PRESENCE_EFFECTIVE)
-    if default_effective and not data.get(CONF_PRESENCE_EFFECTIVE) and not options.get(CONF_PRESENCE_EFFECTIVE):
-        data[CONF_PRESENCE_EFFECTIVE] = default_effective
+    # Fill an empty binding AND repoint a stale legacy (clean-slug) auto-default to
+    # the live system_-prefixed entity. Explicit options overrides are respected.
+    new_effective = migrate_effective_presence(data, options, profile)
+    if new_effective and new_effective != data.get(CONF_PRESENCE_EFFECTIVE):
+        data[CONF_PRESENCE_EFFECTIVE] = new_effective
         changed = True
     return changed, data, options
 

@@ -23,7 +23,7 @@ Türschloss-Policy (Aqara Smart Lock U200) als eigenständige HACS-Custom-Integr
 
 ## Konsumierte Quellen (als Entity-IDs aus dem Config-Flow)
 - Schloss: `lock.aqara_smart_lock_u200`
-- Effective Presence: `sensor.benni_core_state_presence_effective`
+- Effective Presence: `sensor.system_benni_core_state_presence_effective`
 - Batterie (optional): Entity oder Attribut `battery_level` am Schloss
 
 Kein Python-Cross-Modul-Import — strikt Entity-IDs.
