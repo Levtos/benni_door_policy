@@ -115,11 +115,21 @@ DEFAULT_STARTUP_BLOCK_SECONDS: Final = HA_START_DELAY_SECONDS
 PROFILE_PREFILL: Final[dict[str, dict[str, str]]] = {
     PROFILE_BENNI: {
         CONF_LOCK_ENTITY: "lock.aqara_smart_lock_u200",
-        CONF_PRESENCE_EFFECTIVE: "sensor.benni_core_state_presence_effective",
+        # Live existiert (renamed-device, system_-Präfix) NUR der system_-Slug.
+        # Der frühere clean slug existierte nie → presence_effective_missing.
+        CONF_PRESENCE_EFFECTIVE: "sensor.system_benni_core_state_presence_effective",
         CONF_BATTERY: "sensor.aqara_smart_lock_u200_battery",
     },
     PROFILE_ELTERN: {},
 }
+
+# Renamed-device (system_) Entity-ID-Fix: alte Builds prefillten/auto-migrierten
+# den clean slug in entry.data, der live nie existierte → presence_effective_missing.
+# Diese Legacy-IDs werden beim Setup auf den aktuellen PROFILE_PREFILL-Default
+# repointet — NUR wenn keine explizite Options-Override vorliegt (User gewinnt).
+LEGACY_PRESENCE_EFFECTIVE_IDS: Final[frozenset[str]] = frozenset({
+    "sensor.benni_core_state_presence_effective",
+})
 
 # Reihenfolge der Quell-Felder im Config-Flow (ein Schritt) + Optionen.
 SOURCE_KEYS: Final = (

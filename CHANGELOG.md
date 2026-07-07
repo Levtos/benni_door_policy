@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.2.3
+
+- **Fix `presence_effective_missing` (renamed-device `system_` Entity-IDs).** Der
+  Default/PREFILL für `presence_effective_entity` zeigt jetzt auf die live
+  existierende Entity `sensor.system_benni_core_state_presence_effective` (statt
+  auf den clean slug, der live nie existierte → Auto-Lock/Unlock war blockiert).
+- **Setup-Migration repointet** einen stale, von einer älteren Version
+  auto-geschriebenen clean-slug-Default in `entry.data` auf den live-Slug — nur
+  wenn keine explizite Options-Override vorliegt. Explizit vom User gesetzte
+  Entities bleiben respektiert.
+- **Missing-Handling unverändert:** fehlt/`unavailable`/`unknown` die konfigurierte
+  Presence-Effective-Entity, bleibt `presence_effective_missing` aktiv und
+  Auto-Lock/Unlock blockiert (kein stilles Ignorieren).
+- **Keine Änderung an der Lock-/Unlock-Entscheidungslogik.** Kein Core-State-,
+  kein Media-State-Change.
+
 ## 0.2.2
 
 - Runtime-Fallback fuer bestehende ConfigEntries ohne `presence_effective_entity`:
