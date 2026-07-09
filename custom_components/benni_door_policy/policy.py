@@ -31,7 +31,6 @@ from .const import (
     EFFECTIVE_LEAVING,
     EFFECTIVE_STALE,
     EFFECTIVE_UNCERTAIN,
-    LOCK_FEATURE_OPEN,
     LOCK_UNLOCK_ANTI_FLAP_SECONDS,
     RAW_LOCKED,
     RAW_LOCKING,
@@ -50,7 +49,11 @@ from .const import (
 # Unsichere Combined-Zustände — hier niemals automatisch handeln (R-04).
 _UNSAFE_STATES: frozenset[str] = frozenset({STATE_UNBEKANNT, STATE_NICHT_ERREICHBAR})
 _PERSONAL_AWAY = "abwesend"
+_PERSONAL_HOME = "zuhause"
 _PERSONAL_HOME_EQUIVALENT: frozenset[str] = frozenset({"zuhause", "bei_eltern"})
+# Persönliche Anwesenheit ist "unbekannt" → konservativ als zuhause behandeln
+# (Lastenheft §2: keine automatische Aktion, weder Lock noch Unlock).
+_PERSONAL_UNKNOWN: frozenset[str] = frozenset({"", "unknown", "unavailable"})
 
 
 @dataclass(frozen=True)
@@ -138,6 +141,13 @@ def decide(
         confidence is not None and confidence >= AUTO_UNLOCK_MIN_CONFIDENCE
     )
     personal_away = ctx.raw_presence == _PERSONAL_AWAY
+    # Lastenheft §4.3 / R-02: Auto-Unlock verlangt "Persönliche Anwesenheit ≠ zuhause".
+    # Unbekannt/leer wird konservativ als zuhause behandelt (§2) → kein Auto-Unlock.
+    personal_not_home = (
+        ctx.raw_presence is not None
+        and ctx.raw_presence != _PERSONAL_HOME
+        and ctx.raw_presence not in _PERSONAL_UNKNOWN
+    )
     auto_lock_active = (
         ctx.effective_presence in (EFFECTIVE_AWAY, EFFECTIVE_LEAVING)
         and personal_away
@@ -146,6 +156,7 @@ def decide(
     auto_unlock_active = (
         ctx.effective_presence in (EFFECTIVE_HOME, EFFECTIVE_ARRIVING)
         and high_confidence
+        and personal_not_home
         and state == STATE_VERRIEGELT
     )
 
@@ -159,6 +170,10 @@ def decide(
 
     if ctx.effective_presence == EFFECTIVE_HOME:
         blockers.append("present_no_autolock")
+    # R-02: zuhause bereits anwesend → Auto-Unlock ist ein Heimkehr-Event, kein
+    # Dauerzustand. Informativer Blocker macht den Morgen-Fall sichtbar.
+    if state == STATE_VERRIEGELT and ctx.raw_presence == _PERSONAL_HOME:
+        blockers.append("present_no_autounlock")
     if ctx.raw_presence in _PERSONAL_HOME_EQUIVALENT:
         blockers.append("personal_present_no_autolock")
     elif ctx.raw_presence is None or ctx.raw_presence in ("", "unknown", "unavailable"):
@@ -190,7 +205,7 @@ def decide(
         reason = "auto_lock: effective_presence away/leaving + personal abwesend + entriegelt → verriegeln (R-01)"
     elif auto_unlock_active:
         action = ACTION_UNLOCK
-        reason = "auto_unlock: effective_presence home/arriving + high confidence + verriegelt → entriegeln (R-02)"
+        reason = "auto_unlock: home/arriving + high confidence + persönlich ≠ zuhause + verriegelt → entriegeln (R-02)"
     else:
         action = ACTION_NONE
         reason = "kein Szenario aktiv — Schloss bleibt (R-03)"
@@ -199,17 +214,6 @@ def decide(
         recent_lock_action, recent_lock_action_age_s, ACTION_UNLOCK, UNLOCK_COOLDOWN_SECONDS
     ):
         blockers.append("unlock_cooldown")
-        apply_allowed = False
-
-    if action == ACTION_UNLOCK and (
-        ctx.lock_supported_features is not None
-        and ctx.lock_supported_features & LOCK_FEATURE_OPEN
-    ):
-        # R-06 is stronger than R-02. On the live Aqara U200, lock.unlock pulled
-        # the latch even though lock.open was not called, so open-capable lock
-        # entities are not safe auto-unlock targets until a verified unlock-only
-        # service path exists.
-        blockers.append("auto_unlock_blocked_open_capable_lock")
         apply_allowed = False
 
     if action in (ACTION_LOCK, ACTION_UNLOCK):

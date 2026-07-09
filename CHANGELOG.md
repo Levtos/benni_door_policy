@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.2.6
+
+- **Root-Cause-Fix Auto-Unlock (R-02).** Die v0.2.4-Umstellung auf das Presence-
+  Band hatte die Lastenheft-Bedingung „Persönliche Anwesenheit ≠ `zuhause`"
+  (§4.3) aus dem Auto-Unlock verloren. Dadurch feuerte `home` + hohe Confidence +
+  `verriegelt` auch, **wenn Benni schon zuhause war** (z. B. nachts verriegelt) →
+  ungewolltes Entriegeln, das am open-fähigen U200 die Falle zog.
+- **Guard wiederhergestellt:** Auto-Unlock verlangt jetzt wieder
+  `home`/`arriving` **UND** `raw_presence != zuhause` **UND** `verriegelt`.
+  Unbekannte persönliche Anwesenheit wird konservativ als `zuhause` behandelt
+  (kein Unlock). Neuer Debug-Blocker `present_no_autounlock`.
+- **v0.2.5-Hardblock entfernt.** `auto_unlock_blocked_open_capable_lock` war eine
+  Über-Reaktion auf das Symptom und hätte auch das legitime Heimkehr-Entriegeln
+  dauerhaft abgeschaltet. Die Falle wurde nie durch `lock.unlock` an sich
+  gezogen, sondern nur, weil bei Anwesenheit fälschlich entriegelt wurde. R-06
+  bleibt gewahrt: der Coordinator ruft ausschließlich `lock.lock`/`lock.unlock`.
+- `lock_supported_features` / `lock_supports_open` bleiben als reine
+  Observability-Attribute erhalten.
+
 ## 0.2.5
 
 - **Safety-Fix R-06:** Auto-Unlock wird bei Open-faehigen Lock-Entities nicht
