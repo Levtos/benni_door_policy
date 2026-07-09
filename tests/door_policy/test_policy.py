@@ -23,6 +23,7 @@ def _decide(
     raw=None,
     effective=None,
     confidence=None,
+    raw_presence=None,
     battery=None,
     *,
     apply=True,
@@ -36,6 +37,7 @@ def _decide(
             raw_lock_state=raw,
             effective_presence=effective,
             presence_confidence=confidence,
+            raw_presence=raw_presence,
             battery_percent=battery,
         ),
         apply_enabled=apply,
@@ -58,28 +60,38 @@ def test_combined_state_mapping():
 
 # ----- R-01 Auto-Lock -----
 def test_r01_autolock_away_and_unlocked_locks():
-    d = _decide(raw="unlocked", effective="away")
+    d = _decide(raw="unlocked", effective="away", raw_presence="abwesend")
     assert d.action == ACTION_LOCK
     assert d.auto_lock_active is True
     assert d.apply_allowed is True
 
 
 def test_r01_no_lock_when_already_locked():
-    d = _decide(raw="locked", effective="away")
+    d = _decide(raw="locked", effective="away", raw_presence="abwesend")
     assert d.action == ACTION_NONE
     assert d.auto_lock_active is False
 
 
-# ----- R-02 Auto-Unlock -----
-def test_r02_autounlock_arriving_high_confidence_and_locked_unlocks():
-    d = _decide(raw="locked", effective="arriving", confidence=0.93)
-    assert d.action == ACTION_UNLOCK
-    assert d.auto_unlock_active is True
-
-
-def test_r02_no_unlock_when_already_home_presence():
-    d = _decide(raw="locked", effective="home", confidence=0.98)
+def test_r01_no_lock_when_at_parents_even_if_effective_away():
+    d = _decide(raw="unlocked", effective="away", confidence=0.9, raw_presence="bei_eltern")
     assert d.action == ACTION_NONE
+    assert d.auto_lock_active is False
+    assert "personal_present_no_autolock" in d.blockers
+
+
+def test_r01_no_lock_when_personal_presence_missing():
+    d = _decide(raw="unlocked", effective="away", confidence=0.9)
+    assert d.action == ACTION_NONE
+    assert d.auto_lock_active is False
+    assert "presence_personal_missing" in d.blockers
+
+
+# ----- R-02 Auto-Unlock -----
+def test_r02_autounlock_home_or_arriving_high_confidence_and_locked_unlocks():
+    for effective in ("home", "arriving"):
+        d = _decide(raw="locked", effective=effective, confidence=0.93)
+        assert d.action == ACTION_UNLOCK, effective
+        assert d.auto_unlock_active is True
 
 
 def test_r02_no_unlock_on_uncertain_or_stale():
@@ -92,6 +104,12 @@ def test_r02_no_unlock_when_arriving_confidence_low():
     d = _decide(raw="locked", effective="arriving", confidence=0.55)
     assert d.action == ACTION_NONE
     assert "arriving_confidence_low" in d.blockers
+
+
+def test_r02_no_unlock_when_home_confidence_low():
+    d = _decide(raw="locked", effective="home", confidence=0.55)
+    assert d.action == ACTION_NONE
+    assert "home_confidence_low" in d.blockers
 
 
 # ----- R-04 unsichere Zustände -----
@@ -110,7 +128,7 @@ def test_r04_no_action_when_unavailable():
 
 # ----- R-05 keine Verriegelung bei Anwesenheit -----
 def test_r05_no_autolock_when_present():
-    d = _decide(raw="unlocked", effective="home")
+    d = _decide(raw="unlocked", effective="home", raw_presence="zuhause")
     assert d.action == ACTION_NONE
     assert d.auto_lock_active is False
     assert "present_no_autolock" in d.blockers
@@ -118,14 +136,14 @@ def test_r05_no_autolock_when_present():
 
 # ----- Gating: Shadow + Startup -----
 def test_gating_shadow_blocks_apply_but_keeps_action():
-    d = _decide(raw="unlocked", effective="away", apply=False)
+    d = _decide(raw="unlocked", effective="away", raw_presence="abwesend", apply=False)
     assert d.action == ACTION_LOCK          # Aktion bleibt sichtbar
     assert d.apply_allowed is False
     assert "apply_disabled" in d.blockers
 
 
 def test_gating_startup_blocks_apply():
-    d = _decide(raw="unlocked", effective="away", ready=False)
+    d = _decide(raw="unlocked", effective="away", raw_presence="abwesend", ready=False)
     assert d.apply_allowed is False
     assert "startup_block" in d.blockers
 
@@ -146,7 +164,7 @@ def test_battery_critical_attribute():
 
 
 def test_leaving_with_stale_home_band_locks_but_does_not_unlock():
-    d = _decide(raw="unlocked", effective="leaving")
+    d = _decide(raw="unlocked", effective="leaving", raw_presence="abwesend")
     assert d.action == ACTION_LOCK
     assert d.auto_lock_active is True
     assert d.auto_unlock_active is False

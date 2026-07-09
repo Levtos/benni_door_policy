@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.2.4
+
+- **Fix Auto-Unlock im Home-Band.** `effective_presence=home` mit hoher
+  Confidence und verriegeltem Schloss ist jetzt ein Auto-Unlock-Kandidat wie
+  `arriving`. Damit bleibt die Door Policy konsistent mit dem Lastenheft:
+  Heimkommen entriegelt, im Home-Kontext wird nicht automatisch verriegelt.
+- **Fix Auto-Lock bei Eltern-Anwesenheit.** Auto-Lock verlangt jetzt zusätzlich
+  `raw_presence=abwesend`; `bei_eltern` und `zuhause` blockieren Auto-Lock auch
+  dann, wenn `presence_effective` policy-seitig als `away` erscheint.
+- **Tests angepasst:** Der alte Test, der Unlock bei `home` explizit verhindert
+  hat, wurde durch Home-/Arriving-Unlock-Tests plus Low-Confidence-Gate ersetzt.
+  Der konkrete `bei_eltern`-Auto-Lock-Fall ist als Regressionstest abgedeckt.
+
 ## 0.2.3
 
 - **Fix `presence_effective_missing` (renamed-device `system_` Entity-IDs).** Der

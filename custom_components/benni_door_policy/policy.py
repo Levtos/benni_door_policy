@@ -48,6 +48,8 @@ from .const import (
 
 # Unsichere Combined-Zustände — hier niemals automatisch handeln (R-04).
 _UNSAFE_STATES: frozenset[str] = frozenset({STATE_UNBEKANNT, STATE_NICHT_ERREICHBAR})
+_PERSONAL_AWAY = "abwesend"
+_PERSONAL_HOME_EQUIVALENT: frozenset[str] = frozenset({"zuhause", "bei_eltern"})
 
 
 @dataclass(frozen=True)
@@ -57,6 +59,7 @@ class Context:
     raw_lock_state: str | None = None       # locked / unlocked / unlocking / ...
     effective_presence: str | None = None   # home / away / arriving / leaving / uncertain / stale
     presence_confidence: float | None = None
+    raw_presence: str | None = None         # zuhause / bei_eltern / abwesend
     battery_percent: float | None = None    # % (Attribut, optional)
 
 
@@ -116,8 +119,9 @@ def decide(
 ) -> Decision:
     """Vollständige Entscheidung inkl. Gating-Overlay (Lastenheft §4.2/§4.3, R-01..R-08).
 
-    Auto-Lock   (R-01): effective_presence away/leaving UND Zustand entriegelt → ``lock``.
-    Auto-Unlock (R-02): effective_presence arriving mit hoher Confidence UND
+    Auto-Lock   (R-01): effective_presence away/leaving UND persoenliche Anwesenheit
+                        abwesend UND Zustand entriegelt → ``lock``.
+    Auto-Unlock (R-02): effective_presence home/arriving mit hoher Confidence UND
                         Zustand verriegelt → ``unlock``.
     R-03 (Zielzustand erreicht) ergibt sich implizit: Auto-Lock verlangt entriegelt,
     Auto-Unlock verlangt verriegelt — ist das Schloss schon im Ziel, matcht keine Regel.
@@ -131,12 +135,14 @@ def decide(
     high_confidence = (
         confidence is not None and confidence >= AUTO_UNLOCK_MIN_CONFIDENCE
     )
+    personal_away = ctx.raw_presence == _PERSONAL_AWAY
     auto_lock_active = (
         ctx.effective_presence in (EFFECTIVE_AWAY, EFFECTIVE_LEAVING)
+        and personal_away
         and state == STATE_ENTRIEGELT
     )
     auto_unlock_active = (
-        ctx.effective_presence == EFFECTIVE_ARRIVING
+        ctx.effective_presence in (EFFECTIVE_HOME, EFFECTIVE_ARRIVING)
         and high_confidence
         and state == STATE_VERRIEGELT
     )
@@ -151,6 +157,10 @@ def decide(
 
     if ctx.effective_presence == EFFECTIVE_HOME:
         blockers.append("present_no_autolock")
+    if ctx.raw_presence in _PERSONAL_HOME_EQUIVALENT:
+        blockers.append("personal_present_no_autolock")
+    elif ctx.raw_presence is None or ctx.raw_presence in ("", "unknown", "unavailable"):
+        blockers.append("presence_personal_missing")
 
     if ctx.effective_presence is None:
         blockers.append("presence_effective_missing")
@@ -159,6 +169,8 @@ def decide(
 
     if ctx.effective_presence == EFFECTIVE_ARRIVING and not high_confidence:
         blockers.append("arriving_confidence_low")
+    if ctx.effective_presence == EFFECTIVE_HOME and not high_confidence:
+        blockers.append("home_confidence_low")
 
     if not apply_enabled:
         blockers.append("apply_disabled")
@@ -173,10 +185,10 @@ def decide(
         reason = f"unsicherer Zustand ({state}) — keine Aktion (R-04)"
     elif auto_lock_active:
         action = ACTION_LOCK
-        reason = "auto_lock: effective_presence away/leaving + entriegelt → verriegeln (R-01)"
+        reason = "auto_lock: effective_presence away/leaving + personal abwesend + entriegelt → verriegeln (R-01)"
     elif auto_unlock_active:
         action = ACTION_UNLOCK
-        reason = "auto_unlock: effective_presence arriving + high confidence + verriegelt → entriegeln (R-02)"
+        reason = "auto_unlock: effective_presence home/arriving + high confidence + verriegelt → entriegeln (R-02)"
     else:
         action = ACTION_NONE
         reason = "kein Szenario aktiv — Schloss bleibt (R-03)"
