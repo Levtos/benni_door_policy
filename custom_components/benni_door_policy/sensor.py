@@ -10,6 +10,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .const import (
     DATA_COORDINATOR,
     DOMAIN,
+    LOCK_FEATURE_OPEN,
     NAME_DEBUG,
     NAME_LOCK_STATE,
     UID_DEBUG,
@@ -57,6 +58,11 @@ class LockStateSensor(DoorPolicyEntity, SensorEntity):
             "effective_presence": ctx.effective_presence,
             "presence_confidence": ctx.presence_confidence,
             "raw_presence": ctx.raw_presence,
+            "lock_supports_open": (
+                bool(ctx.lock_supported_features & LOCK_FEATURE_OPEN)
+                if ctx.lock_supported_features is not None
+                else None
+            ),
         }
 
 
@@ -92,6 +98,12 @@ class DebugSensor(DoorPolicyEntity, SensorEntity):
             "raw_presence": ctx.raw_presence,
             "battery_percent": ctx.battery_percent,
             "battery_critical": d.battery_critical if d else None,
+            "lock_supported_features": ctx.lock_supported_features,
+            "lock_supports_open": (
+                bool(ctx.lock_supported_features & LOCK_FEATURE_OPEN)
+                if ctx.lock_supported_features is not None
+                else None
+            ),
             "profile": self.coord.profile_route,
             "apply_enabled": self.coord.apply_enabled,
             "startup_ready": self.coord.startup_ready,

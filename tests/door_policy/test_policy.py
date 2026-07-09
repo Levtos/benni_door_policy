@@ -31,6 +31,7 @@ def _decide(
     recent_action=None,
     recent_age=None,
     raw_age=999,
+    lock_supported_features=None,
 ):
     return policy.decide(
         policy.Context(
@@ -39,6 +40,7 @@ def _decide(
             presence_confidence=confidence,
             raw_presence=raw_presence,
             battery_percent=battery,
+            lock_supported_features=lock_supported_features,
         ),
         apply_enabled=apply,
         startup_ready=ready,
@@ -92,6 +94,20 @@ def test_r02_autounlock_home_or_arriving_high_confidence_and_locked_unlocks():
         d = _decide(raw="locked", effective=effective, confidence=0.93)
         assert d.action == ACTION_UNLOCK, effective
         assert d.auto_unlock_active is True
+        assert d.apply_allowed is True
+
+
+def test_r02_autounlock_blocks_apply_for_open_capable_lock():
+    d = _decide(
+        raw="locked",
+        effective="home",
+        confidence=0.98,
+        lock_supported_features=const.LOCK_FEATURE_OPEN,
+    )
+    assert d.action == ACTION_UNLOCK
+    assert d.auto_unlock_active is True
+    assert d.apply_allowed is False
+    assert "auto_unlock_blocked_open_capable_lock" in d.blockers
 
 
 def test_r02_no_unlock_on_uncertain_or_stale():
