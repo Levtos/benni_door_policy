@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.5
+
+- **Safety-Fix R-06:** Auto-Unlock wird bei Open-faehigen Lock-Entities nicht
+  mehr ausgefuehrt. Live-Test mit dem Aqara U200 hat gezeigt, dass
+  `lock.unlock` die Falle ziehen kann, obwohl `lock.open` nicht aufgerufen
+  wurde.
+- Auto-Unlock bleibt als Szenario/Debug sichtbar, bekommt aber den Blocker
+  `auto_unlock_blocked_open_capable_lock`; dadurch wird kein Pending-Apply und
+  kein Schloss-Service-Call erzeugt.
+- Debug-/Statusattribute zeigen `lock_supported_features` und
+  `lock_supports_open`.
+
 ## 0.2.4
 
 - **Fix Auto-Unlock im Home-Band.** `effective_presence=home` mit hoher

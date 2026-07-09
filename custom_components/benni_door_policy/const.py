@@ -89,6 +89,7 @@ UPDATE_INTERVAL_SECONDS: Final = 60       # periodische Re-Evaluation
 UNLOCK_COOLDOWN_SECONDS: Final = 180
 LOCK_UNLOCK_ANTI_FLAP_SECONDS: Final = 120
 AUTO_UNLOCK_MIN_CONFIDENCE: Final = 0.9
+LOCK_FEATURE_OPEN: Final = 1
 
 DEFAULT_BATTERY_CRITICAL: Final = 20      # < 20 % (Lastenheft §6, konfigurierbar)
 

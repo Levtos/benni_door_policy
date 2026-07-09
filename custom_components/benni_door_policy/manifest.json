@@ -1,7 +1,7 @@
 {
   "domain": "benni_door_policy",
   "name": "Benni Door Policy",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "documentation": "https://github.com/Levtos/benni_door_policy",
   "issue_tracker": "https://github.com/Levtos/benni_door_policy/issues",
   "codeowners": ["@Levtos"],

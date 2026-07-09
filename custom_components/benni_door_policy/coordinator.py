@@ -10,7 +10,9 @@ HA-Brücke um die pure Engine (policy.py):
   * Resync nach HA-Start (R-07, 30 s) und periodisch.
 
 SICHERHEIT (R-06, absolut): Der Coordinator ruft ausschließlich ``lock.lock`` und
-``lock.unlock``. ``lock.open`` wird nirgends aufgerufen.
+``lock.unlock``. ``lock.open`` wird nirgends aufgerufen. Auto-Unlock wird bei
+Open-faehigen Lock-Entities zusaetzlich geblockt, weil das U200 live bei
+``lock.unlock`` die Falle ziehen kann.
 """
 from __future__ import annotations
 
@@ -54,6 +56,7 @@ from .const import (
     DEFAULT_PROFILE_ROUTE,
     DEFAULT_STARTUP_BLOCK_SECONDS,
     DOMAIN,
+    LOCK_FEATURE_OPEN,
     UPDATE_INTERVAL_SECONDS,
 )
 from .sources import effective_presence_entity
@@ -67,6 +70,13 @@ def _float_or_none(s: str | None) -> float | None:
         return None
     try:
         return float(s)
+    except (TypeError, ValueError):
+        return None
+
+
+def _int_or_none(value: Any) -> int | None:
+    try:
+        return int(value)
     except (TypeError, ValueError):
         return None
 
@@ -261,6 +271,11 @@ class DoorPolicyCoordinator:
         # Roh-Schlosszustand inkl. unavailable (nicht über _read filtern!).
         lock_st = self.hass.states.get(self.lock_entity) if self.lock_entity else None
         raw_lock = lock_st.state if lock_st is not None else None
+        supported_features = (
+            _int_or_none(lock_st.attributes.get("supported_features"))
+            if lock_st is not None
+            else None
+        )
         return policy.Context(
             raw_lock_state=raw_lock,
             effective_presence=self._read(CONF_PRESENCE_EFFECTIVE),
@@ -269,6 +284,7 @@ class DoorPolicyCoordinator:
             ),
             raw_presence=self._read_attr(CONF_PRESENCE_EFFECTIVE, "raw_presence"),
             battery_percent=self._battery_percent(),
+            lock_supported_features=supported_features,
         )
 
     def _recent_action_age_s(self) -> float | None:
@@ -443,6 +459,12 @@ class DoorPolicyCoordinator:
                 "presence_confidence": ctx.presence_confidence,
                 "raw_presence": ctx.raw_presence,
                 "battery_percent": ctx.battery_percent,
+                "lock_supported_features": ctx.lock_supported_features,
+                "lock_supports_open": (
+                    bool(ctx.lock_supported_features & LOCK_FEATURE_OPEN)
+                    if ctx.lock_supported_features is not None
+                    else None
+                ),
             },
         }
 

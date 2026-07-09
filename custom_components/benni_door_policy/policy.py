@@ -31,6 +31,7 @@ from .const import (
     EFFECTIVE_LEAVING,
     EFFECTIVE_STALE,
     EFFECTIVE_UNCERTAIN,
+    LOCK_FEATURE_OPEN,
     LOCK_UNLOCK_ANTI_FLAP_SECONDS,
     RAW_LOCKED,
     RAW_LOCKING,
@@ -61,6 +62,7 @@ class Context:
     presence_confidence: float | None = None
     raw_presence: str | None = None         # zuhause / bei_eltern / abwesend
     battery_percent: float | None = None    # % (Attribut, optional)
+    lock_supported_features: int | None = None
 
 
 @dataclass
@@ -197,6 +199,17 @@ def decide(
         recent_lock_action, recent_lock_action_age_s, ACTION_UNLOCK, UNLOCK_COOLDOWN_SECONDS
     ):
         blockers.append("unlock_cooldown")
+        apply_allowed = False
+
+    if action == ACTION_UNLOCK and (
+        ctx.lock_supported_features is not None
+        and ctx.lock_supported_features & LOCK_FEATURE_OPEN
+    ):
+        # R-06 is stronger than R-02. On the live Aqara U200, lock.unlock pulled
+        # the latch even though lock.open was not called, so open-capable lock
+        # entities are not safe auto-unlock targets until a verified unlock-only
+        # service path exists.
+        blockers.append("auto_unlock_blocked_open_capable_lock")
         apply_allowed = False
 
     if action in (ACTION_LOCK, ACTION_UNLOCK):
