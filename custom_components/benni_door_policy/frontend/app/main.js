@@ -202,6 +202,7 @@ class BdpApp extends HTMLElement {
       <div class="row"><span class="k">🔐 Roh-Schlosszustand</span><span class="v">${esc(c.raw_lock_state)}</span></div>
       ${chipRow("Effective Presence", "🧭", EFFECTIVE_PRESENCE, c.effective_presence, new Set(["uncertain", "stale"]))}
       <div class="row"><span class="k">🎯 Presence Confidence</span><span class="v">${c.presence_confidence != null ? esc(c.presence_confidence) : "—"}</span></div>
+      <div class="row"><span class="k">👤 Raw Presence</span><span class="v">${c.raw_presence != null ? esc(c.raw_presence) : "—"}</span></div>
       <div class="row"><span class="k">🔋 Batterie</span><span class="v ${s.battery_critical ? "bad" : "good"}">${c.battery_percent != null ? esc(c.battery_percent) + "%" : "—"}</span></div>
       <div class="row"><span class="k">🖥 HA-System</span><span class="v ${s.startup_ready ? "good" : ""}">${s.startup_ready ? "stabil" : "Startup " + esc(s.startup_remaining_s) + "s"}</span></div>
     </div>`;
@@ -214,13 +215,13 @@ class BdpApp extends HTMLElement {
       <div class="scenarios">
         <div class="scn ${al ? "on" : ""}">
           <div class="t">🔒 Auto-Lock</div>
-          <div class="c">Effective Presence = away/leaving &amp; Schloss = entriegelt</div>
+          <div class="c">Effective Presence = away/leaving, Raw Presence = abwesend, Schloss = entriegelt</div>
           <div class="c" style="margin-top:6px">⏱ Stabilisierung ${esc(s.stabilize_lock_s)}s</div>
           <span class="st">${al ? "Aktiv" : "Inaktiv"}</span>
         </div>
         <div class="scn ${au ? "on" : ""}">
           <div class="t">🔓 Auto-Unlock</div>
-          <div class="c">Effective Presence = arriving, Confidence hoch, Schloss = verriegelt</div>
+          <div class="c">Effective Presence = home/arriving, Confidence hoch, Schloss = verriegelt</div>
           <div class="c" style="margin-top:6px">⏱ Stabilisierung ${esc(s.stabilize_unlock_s)}s</div>
           <span class="st">${au ? "Aktiv" : "Inaktiv"}</span>
         </div>
@@ -280,6 +281,7 @@ class BdpApp extends HTMLElement {
       ["auto_unlock_aktiv", yn(s.auto_unlock_active), s.auto_unlock_active ? "good" : ""],
       ["effective_presence", esc(c.effective_presence), ""],
       ["presence_confidence", c.presence_confidence != null ? esc(c.presence_confidence) : "—", ""],
+      ["raw_presence", c.raw_presence != null ? esc(c.raw_presence) : "—", ""],
       ["batterie_prozent", c.battery_percent != null ? esc(c.battery_percent) : "—", ""],
       ["batterie_kritisch", yn(s.battery_critical), s.battery_critical ? "bad" : ""],
     ];
@@ -310,12 +312,12 @@ class BdpApp extends HTMLElement {
     return `<div class="card">
       <h2>🧭 Logik-Ablauf</h2>
       <div class="flow">
-        <span class="fstep">👤 Abwesend</span><span class="arr">→</span>
+        <span class="fstep">👤 Raw abwesend</span><span class="arr">→</span>
         <span class="fstep">⏳ 60s warten</span><span class="arr">→</span>
         <span class="fstep lock">🔒 Verriegeln</span>
       </div>
       <div class="flow">
-        <span class="fstep green">🏠 Effective arriving</span><span class="arr">→</span>
+        <span class="fstep green">🏠 Effective home/arriving</span><span class="arr">→</span>
         <span class="fstep">⏳ 5s warten</span><span class="arr">→</span>
         <span class="fstep unlock">🔓 Entriegeln</span>
       </div>

@@ -267,6 +267,7 @@ class DoorPolicyCoordinator:
             presence_confidence=_float_or_none(
                 self._read_attr(CONF_PRESENCE_EFFECTIVE, "confidence")
             ),
+            raw_presence=self._read_attr(CONF_PRESENCE_EFFECTIVE, "raw_presence"),
             battery_percent=self._battery_percent(),
         )
 
@@ -440,6 +441,7 @@ class DoorPolicyCoordinator:
                 "raw_lock_state": ctx.raw_lock_state,
                 "effective_presence": ctx.effective_presence,
                 "presence_confidence": ctx.presence_confidence,
+                "raw_presence": ctx.raw_presence,
                 "battery_percent": ctx.battery_percent,
             },
         }
