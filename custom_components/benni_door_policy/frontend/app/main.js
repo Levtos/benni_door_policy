@@ -221,7 +221,7 @@ class BdpApp extends HTMLElement {
         </div>
         <div class="scn ${au ? "on" : ""}">
           <div class="t">🔓 Auto-Unlock</div>
-          <div class="c">Effective Presence = home/arriving, Confidence hoch, Schloss = verriegelt</div>
+          <div class="c">Effective Presence = home/arriving, Confidence hoch, Raw Presence &ne; zuhause, Schloss = verriegelt</div>
           <div class="c" style="margin-top:6px">⏱ Stabilisierung ${esc(s.stabilize_unlock_s)}s</div>
           <span class="st">${au ? "Aktiv" : "Inaktiv"}</span>
         </div>

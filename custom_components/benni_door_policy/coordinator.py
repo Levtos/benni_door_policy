@@ -10,9 +10,9 @@ HA-Brücke um die pure Engine (policy.py):
   * Resync nach HA-Start (R-07, 30 s) und periodisch.
 
 SICHERHEIT (R-06, absolut): Der Coordinator ruft ausschließlich ``lock.lock`` und
-``lock.unlock``. ``lock.open`` wird nirgends aufgerufen. Auto-Unlock wird bei
-Open-faehigen Lock-Entities zusaetzlich geblockt, weil das U200 live bei
-``lock.unlock`` die Falle ziehen kann.
+``lock.unlock``. ``lock.open`` wird nirgends aufgerufen. Auto-Unlock feuert nur bei
+echter Heimkehr (``raw_presence != zuhause``), nicht während Anwesenheit — damit
+zieht ``lock.unlock`` am open-fähigen U200 nicht die Falle im bewohnten Zustand.
 """
 from __future__ import annotations
 

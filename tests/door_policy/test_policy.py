@@ -90,24 +90,51 @@ def test_r01_no_lock_when_personal_presence_missing():
 
 # ----- R-02 Auto-Unlock -----
 def test_r02_autounlock_home_or_arriving_high_confidence_and_locked_unlocks():
+    # Heimkehr: Heimband home/arriving + persönliche Anwesenheit noch != zuhause.
     for effective in ("home", "arriving"):
-        d = _decide(raw="locked", effective=effective, confidence=0.93)
+        d = _decide(raw="locked", effective=effective, confidence=0.93, raw_presence="abwesend")
         assert d.action == ACTION_UNLOCK, effective
         assert d.auto_unlock_active is True
         assert d.apply_allowed is True
 
 
-def test_r02_autounlock_blocks_apply_for_open_capable_lock():
+def test_r02_no_autounlock_when_personally_home():
+    # Regression FLEET-Morgen-Fall: zuhause + verriegelt darf NICHT auto-entriegeln
+    # (R-02 verlangt "Persönliche Anwesenheit != zuhause", Lastenheft §4.3).
+    d = _decide(raw="locked", effective="home", confidence=0.98, raw_presence="zuhause")
+    assert d.action == ACTION_NONE
+    assert d.auto_unlock_active is False
+    assert "present_no_autounlock" in d.blockers
+
+
+def test_r02_no_autounlock_when_personal_presence_missing():
+    # Unbekannte persönliche Anwesenheit → konservativ als zuhause → kein Unlock.
+    d = _decide(raw="locked", effective="home", confidence=0.98)
+    assert d.action == ACTION_NONE
+    assert d.auto_unlock_active is False
+
+
+def test_r02_autounlock_at_parents_is_candidate():
+    # Lastenheft §4.3: "!= zuhause" — bei_eltern (Nebenhaus) ist Unlock-Kandidat.
+    d = _decide(raw="locked", effective="home", confidence=0.98, raw_presence="bei_eltern")
+    assert d.action == ACTION_UNLOCK
+    assert d.auto_unlock_active is True
+
+
+def test_r02_open_capable_lock_still_unlocks():
+    # v0.2.5-Hardblock entfernt: open-fähige Locks (U200, supported_features&1)
+    # entriegeln bei echter Heimkehr wieder normal. R-06 bleibt via lock.unlock gewahrt.
     d = _decide(
         raw="locked",
         effective="home",
         confidence=0.98,
+        raw_presence="abwesend",
         lock_supported_features=const.LOCK_FEATURE_OPEN,
     )
     assert d.action == ACTION_UNLOCK
     assert d.auto_unlock_active is True
-    assert d.apply_allowed is False
-    assert "auto_unlock_blocked_open_capable_lock" in d.blockers
+    assert d.apply_allowed is True
+    assert "auto_unlock_blocked_open_capable_lock" not in d.blockers
 
 
 def test_r02_no_unlock_on_uncertain_or_stale():
@@ -187,7 +214,7 @@ def test_leaving_with_stale_home_band_locks_but_does_not_unlock():
 
 
 def test_arriving_after_stable_away_is_unlock_candidate():
-    d = _decide(raw="locked", effective="arriving", confidence=0.95)
+    d = _decide(raw="locked", effective="arriving", confidence=0.95, raw_presence="abwesend")
     assert d.action == ACTION_UNLOCK
     assert d.auto_unlock_active is True
 
@@ -203,6 +230,7 @@ def test_lock_unlock_anti_flap_blocks_fast_opposite_action():
         raw="locked",
         effective="arriving",
         confidence=0.95,
+        raw_presence="abwesend",
         recent_action=ACTION_LOCK,
         recent_age=30,
     )
@@ -216,6 +244,7 @@ def test_unlock_cooldown_blocks_fast_repeated_unlock():
         raw="locked",
         effective="arriving",
         confidence=0.95,
+        raw_presence="abwesend",
         recent_action=ACTION_UNLOCK,
         recent_age=30,
     )
@@ -225,7 +254,7 @@ def test_unlock_cooldown_blocks_fast_repeated_unlock():
 
 
 def test_external_raw_lock_change_suppresses_policy_oscillation():
-    d = _decide(raw="locked", effective="arriving", confidence=0.95, raw_age=30)
+    d = _decide(raw="locked", effective="arriving", confidence=0.95, raw_presence="abwesend", raw_age=30)
     assert d.action == ACTION_UNLOCK
     assert d.apply_allowed is False
     assert "raw_lock_recently_changed" in d.blockers
