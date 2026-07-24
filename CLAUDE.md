@@ -69,3 +69,13 @@ Strangler-Quelle: `haos_benni/packages/70_safety/50_automations/10_lock_auto_con
 ## Git-Freigabe (stehend)
 
 Committen/PR/merge/Release frei, solange < v1.0.0 (siehe `D:\Dokumente\GitHub\CLAUDE.md`).
+
+## UX-Frontend-Standard (verbindlich)
+
+Für jede UX-/Frontend-Arbeit gilt der verbindliche, fleet-weite UX-, Technologie- und
+Designstandard. Kanonische Quelle: ADR `ha-platform/control:docs/adr/0001-ux-frontend-standard.md`
+(Issue `control#58`). Kurzform: Svelte 5 · Vite · TypeScript · Bits UI · shadcn-svelte ·
+Tailwind · CSS Custom Properties · Lucide; Design "Graphite Dark – semantic accent system";
+zentrale UX = statisches Bundle + dünnes UX-Gateway (primär HA-Ingress); versionierte/typisierte
+Contracts. Details und Abweichungsprozess: `docs/ux-frontend-standard.md` und das ADR. Bestehende
+Regeln werden dadurch ergänzt, nie überschrieben oder entfernt.
